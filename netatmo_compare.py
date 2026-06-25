@@ -72,6 +72,7 @@ DEFAULTS = {
     "heat_lookback_hours": 24,   #   a atteint heat_outdoor_max_c sur les dernières N heures
     "ntfy_topic": None,          # push iPhone via ntfy.sh (None = notification macOS locale)
     "ntfy_server": "https://ntfy.sh",
+    "dashboard_url": None,       # URL ouverte au tap sur la notif (ex. page GitHub Pages)
     "indoor_rooms": [],          # [] = toutes les zones détectées ; sinon liste de noms
     "use_weather": True,         # zones depuis les capteurs météo (getstationsdata)
     "use_thermostats": True,     # zones depuis vannes NRV + thermostat NATherm1 (API Energy)
@@ -115,6 +116,7 @@ def load_config():
         "NETATMO_REFRESH_TOKEN": "refresh_token",
         "NTFY_TOPIC": "ntfy_topic",
         "NTFY_SERVER": "ntfy_server",
+        "DASHBOARD_URL": "dashboard_url",
     }
     for ek, ck in env_map.items():
         if env.get(ek):
@@ -608,6 +610,9 @@ def notify_ntfy(cfg, title, message, tag="house"):
     req.add_header("Title", _ascii(title))
     req.add_header("Tags", tag)
     req.add_header("Priority", "default")
+    click = cfg.get("dashboard_url")
+    if click:
+        req.add_header("Click", click)  # ouvre le dashboard au tap sur la notif
     try:
         ctx = ssl.create_default_context()
         with urllib.request.urlopen(req, timeout=15, context=ctx):
@@ -790,18 +795,22 @@ def main():
 
     if args.test_notify:
         # Config minimale pour la notif (sans exiger les identifiants Netatmo)
-        tcfg = {"ntfy_topic": None, "ntfy_server": "https://ntfy.sh", "_quiet": False}
+        tcfg = {"ntfy_topic": None, "ntfy_server": "https://ntfy.sh",
+                "dashboard_url": None, "_quiet": False}
         if os.path.exists(CONFIG_PATH):
             try:
                 fc = json.load(open(CONFIG_PATH, encoding="utf-8"))
                 tcfg["ntfy_topic"] = fc.get("ntfy_topic")
                 tcfg["ntfy_server"] = fc.get("ntfy_server") or tcfg["ntfy_server"]
+                tcfg["dashboard_url"] = fc.get("dashboard_url")
             except Exception:
                 pass
         if os.environ.get("NTFY_TOPIC"):
             tcfg["ntfy_topic"] = os.environ["NTFY_TOPIC"]
         if os.environ.get("NTFY_SERVER"):
             tcfg["ntfy_server"] = os.environ["NTFY_SERVER"]
+        if os.environ.get("DASHBOARD_URL"):
+            tcfg["dashboard_url"] = os.environ["DASHBOARD_URL"]
         ok = notify(tcfg, "Netatmo — test",
                     "Souplex 26.8°C · il fait plus frais dehors → OUVRIR. (test)")
         canal = f"ntfy ({tcfg['ntfy_topic']})" if tcfg["ntfy_topic"] else "macOS"
