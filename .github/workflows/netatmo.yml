@@ -15,7 +15,7 @@ name: Netatmo alerte chaleur
  
 on:
   schedule:
-    # Toutes les 30 min, de 18:00 à 09:30 UTC (~16h-07h heure de Paris en été).
+    # Toutes les 30 min, de 18:00 à 09:30 UTC (~16h-09h heure de Paris en été).
     - cron: "15,45 16-23,0-7 * * *"
   workflow_dispatch: {}   # lancement manuel depuis l'onglet Actions
  
