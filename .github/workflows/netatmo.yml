@@ -1,1 +1,77 @@
+# Fichier à placer dans ton dépôt à : .github/workflows/netatmo.yml
+#
+# Fait tourner netatmo_compare.py toutes les 30 min sur les serveurs GitHub (gratuit),
+# et envoie les alertes sur ton iPhone via ntfy. Aucun ordinateur à laisser allumé.
+#
+# Les identifiants viennent des "Secrets" du dépôt (Settings > Secrets and variables > Actions).
+# L'état (historique + refresh_token qui tourne) est conservé entre deux exécutions via le cache.
 
+name: Netatmo alerte chaleur
+
+on:
+  schedule:
+    # Toutes les 30 min, de 04:00 à 21:59 UTC (~06h-00h heure de Paris en été).
+    - cron: "*/30 4-21 * * *"
+  workflow_dispatch: {}   # permet aussi un lancement manuel depuis l'onglet Actions
+
+permissions:
+  contents: read
+
+# Évite que deux exécutions tournent en même temps (sinon le refresh_token se désynchronise)
+concurrency:
+  group: netatmo
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Restaure l'état précédent (historique + dernier refresh_token).
+      # Clé unique par exécution + restore-keys préfixe = on lit le plus récent et on réécrit.
+      - name: Restaurer l'état
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: netatmo-state-${{ github.run_id }}
+          restore-keys: |
+            netatmo-state-
+
+      - name: Exécuter
+        env:
+          NETATMO_CLIENT_ID: ${{ secrets.NETATMO_CLIENT_ID }}
+          NETATMO_CLIENT_SECRET: ${{ secrets.NETATMO_CLIENT_SECRET }}
+          NETATMO_REFRESH_TOKEN: ${{ secrets.NETATMO_REFRESH_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NETATMO_STATE_DIR: state
+          # --- Réglages (modifiables ici, pas besoin de fichier de config) ---
+          NETATMO_INDOOR_ROOMS: "Entrée,Salon,Kylia"
+          NETATMO_RADIUS_KM: "2.0"
+          NETATMO_HEAT_MAX_C: "28.0"          # mode forte chaleur au-dessus de ce max extérieur
+          NETATMO_NOTIFY_MIN_INDOOR_C: "25.0" # alerte OUVRIR seulement si la pièce dépasse ça
+        run: |
+          mkdir -p state
+          python3 netatmo_compare.py --notify --quiet
+
+      - name: Sauvegarder l'état
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: netatmo-state-${{ github.run_id }}
+
+      # Optionnel : récupère le dashboard.html dans les artefacts de l'exécution
+      - name: Publier le dashboard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard
+          path: state/dashboard.html
+          if-no-files-found: ignore
