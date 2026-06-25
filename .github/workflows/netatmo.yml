@@ -72,6 +72,7 @@ jobs:
           NETATMO_NOTIFY_MIN_INDOOR_C: ${{ vars.NETATMO_NOTIFY_MIN_INDOOR_C || '25.0' }}  # alerte OUVRIR seulement si la pièce dépasse ça
           NETATMO_MARGIN_OPEN_C: ${{ vars.NETATMO_MARGIN_OPEN_C || '1.0' }}
           NETATMO_MARGIN_CLOSE_C: ${{ vars.NETATMO_MARGIN_CLOSE_C || '0.0' }}
+          DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
         run: |
           mkdir -p state
           python3 netatmo_compare.py --notify --quiet
